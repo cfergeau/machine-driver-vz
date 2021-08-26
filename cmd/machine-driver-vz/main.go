@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	l "log"
 	"os"
@@ -9,32 +10,13 @@ import (
 	"time"
 
 	"github.com/Code-Hex/vz"
+	"github.com/code-ready/crc/pkg/crc/machine/bundle"
 	"github.com/code-ready/machine/drivers/hyperkit"
 	"github.com/code-ready/machine/libmachine/drivers"
 	"github.com/kr/pty"
 	"github.com/pkg/term/termios"
 	"golang.org/x/sys/unix"
 )
-
-var vmConfig = hyperkit.Driver{
-	VMDriver: &drivers.VMDriver{
-		ImageSourcePath: "/Users/teuf/.crc/cache/crc_hyperkit_4.8.4/crc.raw.img",
-		ImageFormat:     "raw", // must be 'raw'
-		Memory:          1 * 1024 * 1024 * 1024,
-		CPU:             4,
-	},
-
-	VmlinuzPath:   "/Users/teuf/.crc/cache/crc_hyperkit_4.8.4/vmlinuz-4.18.0-305.10.2.el8_4.x86_64",
-	InitrdPath:    "/Users/teuf/.crc/cache/crc_hyperkit_4.8.4/initramfs-4.18.0-305.10.2.el8_4.x86_64.img",
-	KernelCmdLine: "console=hvc0 rd.udev.debug rd.debug irqfixup " + "BOOT_IMAGE=(hd0,gpt3)/ostree/rhcos-0f2014cf018bafd35ec93f5b8813b2d105c002f6d998c42f8ec7792e5f2b933b/vmlinuz-4.18.0-305.10.2.el8_4.x86_64 random.trust_cpu=on  ignition.platform.id=qemu ostree=/ostree/boot.1/rhcos/0f2014cf018bafd35ec93f5b8813b2d105c002f6d998c42f8ec7792e5f2b933b/0 root=UUID=d74a2195-33c4-440e-bbbe-9e3fa50953e6 rw rootflags=prjquota",
-
-	// Need to be supported?
-	UUID:       "",
-	VpnKitSock: "",
-	VpnKitUUID: "",
-	VSockPorts: []string{},
-	VMNet:      false,
-}
 
 var log *l.Logger
 
@@ -58,6 +40,35 @@ func setNonCanonicalMode(f *os.File) {
 }
 
 func main() {
+	bundleInfo, err := bundle.Get("crc_hyperkit_4.8.4")
+	if err != nil {
+		panic(fmt.Sprintf("failed to get bundle %v", err))
+	}
+	vmConfig := hyperkit.Driver{
+		VMDriver: &drivers.VMDriver{
+			ImageSourcePath: bundleInfo.GetDiskImagePath() + ".vz.raw",
+			ImageFormat:     "raw", // must be 'raw'
+			Memory:          1 * 1024 * 1024 * 1024,
+			CPU:             4,
+		},
+
+		VmlinuzPath:   bundleInfo.GetKernelPath(),
+		InitrdPath:    bundleInfo.GetInitramfsPath(),
+		KernelCmdLine: "console=hvc0 irqfixup " + bundleInfo.GetKernelCommandLine(),
+
+		// Need to be supported?
+		UUID:       "",
+		VpnKitSock: "",
+		VpnKitUUID: "",
+		VSockPorts: []string{},
+		VMNet:      false,
+	}
+	if false {
+		// enable dracut debug logs in order to increase output verbosity on theh serial console
+		// with this set, some data will always be output on hvc0 during early boot
+		vmConfig.KernelCmdLine += " rd.udev.debug rd.debug"
+	}
+	fmt.Printf("vmConfig: %v %v\n", vmConfig.VMDriver, vmConfig)
 
 	// 238 57
 	// width, height, err := terminal.GetSize(int(os.Stdout.Fd()))
