@@ -5,12 +5,14 @@ import (
 	"io"
 	l "log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/Code-Hex/vz"
 	"github.com/code-ready/crc/pkg/crc/machine/bundle"
+	crcos "github.com/code-ready/crc/pkg/os"
 	"github.com/code-ready/machine/drivers/hyperkit"
 	"github.com/code-ready/machine/libmachine/drivers"
 	"github.com/kr/pty"
@@ -39,14 +41,52 @@ func setNonCanonicalMode(f *os.File) {
 	termios.Tcsetattr(f.Fd(), termios.TCSANOW, &attr)
 }
 
+func convertDiskImage(bundleInfo *bundle.CrcBundleInfo) (string, error) {
+	rawName := bundleInfo.GetDiskImagePath() + ".vz.raw"
+	if _, err := os.Stat(rawName); err == nil {
+		return rawName, nil
+	}
+	/*
+		// 'qcow-tool decode' did not work as expected for raw image conversion, the VM was unable to find its root partition after conversion
+
+		if err := crcos.CopyFileContents(bundleInfo.GetDiskImagePath(), rawName, 0600); err != nil {
+			return "", err
+		}
+
+		fmt.Printf("Converting disk image\n")
+
+		stdout, stderr, err := crcos.RunWithDefaultLocale(QcowToolPath, "decode", rawName)
+		if err != nil {
+			fmt.Printf("RunWithDefaultLocale error: %s %s\n", stdout, stderr)
+			return "", err
+		}
+	*/
+	qemuImgPath, err := exec.LookPath("qemu-img")
+	if err != nil {
+		fmt.Println("Could not find the qemu-img execurable in $PATH, please install it using 'brew install qemu'")
+		return "", err
+	}
+	fmt.Printf("Converting disk image\n")
+	stdout, stderr, err := crcos.RunWithDefaultLocale(qemuImgPath, "convert", "-f", "qcow2", "-O", "raw", bundleInfo.GetDiskImagePath(), rawName)
+	if err != nil {
+		fmt.Printf("RunWithDefaultLocale error: %s %s\n", stdout, stderr)
+		return "", err
+	}
+	return rawName, nil
+}
+
 func main() {
 	bundleInfo, err := bundle.Get("crc_hyperkit_4.8.4")
 	if err != nil {
 		panic(fmt.Sprintf("failed to get bundle %v", err))
 	}
+	diskImagePath, err := convertDiskImage(bundleInfo)
+	if err != nil {
+		panic(fmt.Sprintf("failed to convert disk image %v", err))
+	}
 	vmConfig := hyperkit.Driver{
 		VMDriver: &drivers.VMDriver{
-			ImageSourcePath: bundleInfo.GetDiskImagePath() + ".vz.raw",
+			ImageSourcePath: diskImagePath,
 			ImageFormat:     "raw", // must be 'raw'
 			Memory:          1 * 1024 * 1024 * 1024,
 			CPU:             4,
