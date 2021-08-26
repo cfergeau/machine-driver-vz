@@ -76,7 +76,15 @@ func convertDiskImage(bundleInfo *bundle.CrcBundleInfo) (string, error) {
 }
 
 func main() {
-	bundleInfo, err := bundle.Get("crc_hyperkit_4.8.4")
+	if len(os.Args) != 2 {
+		fmt.Println(fmt.Sprintf("Usage: %s bundle-name", os.Args[0]))
+		fmt.Println("")
+		fmt.Println(fmt.Sprintf("Example: %s crc_hyperkit_4.8.4", os.Args[0]))
+		fmt.Println("The bundle must be cached in ~/.crc/cache")
+		return
+	}
+
+	bundleInfo, err := bundle.Get(os.Args[1])
 	if err != nil {
 		panic(fmt.Sprintf("failed to get bundle %v", err))
 	}
