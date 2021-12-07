@@ -3,19 +3,13 @@ module github.com/code-ready/machine-driver-vz
 go 1.16
 
 require (
-	github.com/Code-Hex/vz v0.0.3
-	github.com/code-ready/crc v1.31.2
+	github.com/Code-Hex/vz v0.0.5-0.20211213160915-f0b7da742b9f
+	github.com/code-ready/crc v1.37.0
 	github.com/code-ready/machine v0.0.0-20210616065635-eff475d32b9a
-	github.com/creack/pty v1.1.11 // indirect
-	github.com/h2non/filetype v1.1.2-0.20210602110014-3305bbb7ac7b // indirect
-	github.com/jinzhu/copier v0.3.2 // indirect
-	github.com/klauspost/compress v1.13.4 // indirect
 	github.com/kr/pty v1.1.8
-	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/pkg/term v1.1.0
-	golang.org/x/sys v0.0.0-20210823070655-63515b42dcdf
-	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
-	golang.org/x/text v0.3.7 // indirect
+	github.com/rs/xid v1.3.0 // indirect
+	golang.org/x/sys v0.0.0-20211210111614-af8b64212486
 )
 
 replace (
