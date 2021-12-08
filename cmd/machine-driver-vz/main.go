@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	l "log"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -244,9 +245,104 @@ func main() {
 		log.Println("in start:", err)
 	})
 
-	<-time.After(3 * time.Minute)
+	<-time.After(time.Minute)
+
+	socketDevices := vm.SocketDevices()
+
+	for _, socketDevice := range socketDevices {
+		/*
+			listener,err := vz.Listen(socketDevice, 4444)
+			if err != nil {
+				log.Println("error listening")
+			}
+		*/
+		var listener net.Listener
+		listener = Listen(socketDevice, 4444)
+		go func() {
+			log.Println("before accept()")
+			conn, err := listener.Accept()
+			log.Println("after accept(), err: ", err)
+			//log.Println(fmt.Sprintf("fd: %d src: %d dst: %d",conn.FileDescriptor(), conn.SourcePort(), conn.DestinationPort()))
+			log.Println(conn.LocalAddr(), conn.RemoteAddr())
+			//len, err := syscall.Read(int(conn.FileDescriptor()), fileData)
+			for {
+				fileData := make([]byte, 128)
+				len, err := conn.Read(fileData)
+				log.Println(fmt.Sprintf("read %d bytes with error: %v", len, err))
+				log.Println(string(fileData))
+				if err != nil || len == 0 {
+					break
+				}
+				len, err = conn.Write(fileData[0 : len-1])
+				log.Println(fmt.Sprintf("wrote %d bytes with error: %v", len, err))
+			}
+		}()
+	}
+
+	for {
+		for _, socketDevice := range socketDevices {
+			socketDevice.ConnectToPort(4321, func(conn *vz.VirtioSocketConnection, err error) {
+				log.Println("connection")
+				log.Println(fmt.Sprintf("fd: %d dst: %d src: %d", conn.FileDescriptor(), conn.DestinationPort(), conn.SourcePort()))
+				log.Println(fmt.Sprintf("error: %v", err))
+				if err != nil {
+					return
+				}
+				fd := int(conn.FileDescriptor())
+				n, err := syscall.Write(fd, []byte("hello world!!\n"))
+				log.Println("syscall.Write")
+				log.Println(fmt.Sprintf("wrote %d bytes, error: %v", n, err))
+			})
+		}
+		time.Sleep(time.Minute)
+	}
+	<-time.After(3000 * time.Minute)
 
 	// vm.Resume(func(err error) {
 	// 	fmt.Println("in resume:", err)
 	// })
+}
+
+type dup struct {
+	conn *vz.VirtioSocketConnection
+	err  error
+}
+
+type Listener struct {
+	port            uint32
+	incomingConnsCh chan dup
+}
+
+func Listen(v *vz.VirtioSocketDevice, port uint32) *Listener {
+	// for a given device, we should only use one instance of *VirtioSocketListener
+	listener := &Listener{
+		port:            port,
+		incomingConnsCh: make(chan dup, 1),
+	}
+	shouldAcceptConn := func(conn *vz.VirtioSocketConnection, err error) {
+		listener.incomingConnsCh <- dup{conn, err}
+	}
+
+	virtioSocketListener := vz.NewVirtioSocketListener(shouldAcceptConn)
+	v.SetSocketListenerForPort(virtioSocketListener, port)
+	return listener
+}
+
+func (l *Listener) Accept() (net.Conn, error) {
+	dup := <-l.incomingConnsCh
+	return dup.conn, dup.err
+}
+
+// Addr returns the listener's network address.
+func (l *Listener) Addr() net.Addr {
+	return &vz.Addr{
+		CID:  unix.VMADDR_CID_HOST,
+		Port: l.port,
+	}
+}
+
+func (l *Listener) Close() error {
+	// need to close incomingConns and cleanly exit the associated go func when this happens
+	// also need to disconnect from port
+	return nil
 }
