@@ -20,6 +20,7 @@ package vz
 
 import (
 	vzdriver "github.com/code-ready/machine/drivers/vz"
+	"github.com/code-ready/machine/libmachine/state"
 	"github.com/code-ready/machine/libmachine/drivers"
 )
 
@@ -58,7 +59,7 @@ func (d *Driver) GetMachineName() string {
 
 // GetBundleName() Returns the name of the unpacked bundle which was used to create this machine
 func (d *Driver) GetBundleName() (string, error) {
-	return nil
+	return "", nil
 }
 
 // GetState returns the state that the host is in (running, stopped, etc)
