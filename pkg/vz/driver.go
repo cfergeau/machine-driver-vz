@@ -43,24 +43,25 @@ func (d *Driver) Create() error {
 
 // DriverName returns the name of the driver
 func (d *Driver) DriverName() string {
-	return ""
+	return DriverName
+}
+
+// Get Version information
+func (d *Driver) DriverVersion() string {
+	return DriverVersion
 }
 
 // GetIP returns an IP or hostname that this host is available at
-// e.g. 1.2.3.4 or docker-host-d60b70a14d3a.cloudapp.net
-func (d *Driver) GetIP() (string, error) {
-	return "", nil
-}
+// inherited from  libmachine.BaseDriver
+//func (d *Driver) GetIP() (string, error)
 
 // GetMachineName returns the name of the machine
-func (d *Driver) GetMachineName() string {
-	return ""
-}
+// inherited from  libmachine.BaseDriver
+//func (d *Driver) GetMachineName() string
 
 // GetBundleName() Returns the name of the unpacked bundle which was used to create this machine
-func (d *Driver) GetBundleName() (string, error) {
-	return "", nil
-}
+// inherited from  libmachine.BaseDriver
+//func (d *Driver) GetBundleName() (string, error)
 
 // GetState returns the state that the host is in (running, stopped, etc)
 func (d *Driver) GetState() (state.State, error) {
@@ -95,9 +96,4 @@ func (d *Driver) Start() error {
 // Stop a host gracefully
 func (d *Driver) Stop() error {
 	return nil
-}
-
-// Get Version information
-func (d *Driver) DriverVersion() string {
-	return ""
 }
