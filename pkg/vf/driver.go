@@ -19,14 +19,17 @@ limitations under the License.
 package vf
 
 import (
+	"github.com/Code-Hex/vz"
 	vfdriver "github.com/code-ready/machine/drivers/vf"
-	"github.com/code-ready/machine/libmachine/state"
 	"github.com/code-ready/machine/libmachine/drivers"
+	"github.com/code-ready/machine/libmachine/state"
 )
 
 type Driver vfdriver.Driver
 
 func NewDriver() *Driver {
+	// checks that vfdriver.Driver implements the libmachine.Driver interface
+	var _ drivers.Driver = &Driver{}
 	return &Driver{
 		VMDriver: &drivers.VMDriver{
 			BaseDriver: &drivers.BaseDriver{},
@@ -34,11 +37,6 @@ func NewDriver() *Driver {
 			Memory:     DefaultMemory,
 		},
 	}
-}
-
-// Create a host using the driver's config
-func (d *Driver) Create() error {
-	return nil
 }
 
 // DriverName returns the name of the driver
@@ -63,6 +61,41 @@ func (d *Driver) DriverVersion() string {
 // inherited from  libmachine.BaseDriver
 //func (d *Driver) GetBundleName() (string, error)
 
+// PreCreateCheck allows for pre-create operations to make sure a driver is ready for creation
+func (d *Driver) PreCreateCheck() error {
+	return nil
+}
+
+// Create a host using the driver's config
+func (d *Driver) Create() error {
+	bootLoader := vz.NewLinuxBootLoader(
+		d.VmlinuzPath,
+		vz.WithCommandLine(d.KernelCmdLine),
+		vz.WithInitrd(d.InitrdPath),
+	)
+
+	config := vz.NewVirtualMachineConfiguration(
+		bootLoader,
+		uint(d.CPU),
+		uint64(d.Memory),
+	)
+
+	// add console for serial output
+
+	natAttachment := vz.NewNATNetworkDeviceAttachment()
+	networkConfig := vz.NewVirtioNetworkDeviceConfiguration(natAttachment)
+	config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{
+		networkConfig,
+	})
+
+	entropyConfig := vz.NewVirtioEntropyDeviceConfiguration()
+	config.SetEntropyDevicesVirtualMachineConfiguration([]*vz.VirtioEntropyDeviceConfiguration{
+		entropyConfig,
+	})
+
+	// add disk
+}
+
 // GetState returns the state that the host is in (running, stopped, etc)
 func (d *Driver) GetState() (state.State, error) {
 	return state.Error, nil
@@ -70,11 +103,6 @@ func (d *Driver) GetState() (state.State, error) {
 
 // Kill stops a host forcefully
 func (d *Driver) Kill() error {
-	return nil
-}
-
-// PreCreateCheck allows for pre-create operations to make sure a driver is ready for creation
-func (d *Driver) PreCreateCheck() error {
 	return nil
 }
 
