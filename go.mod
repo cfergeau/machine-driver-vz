@@ -1,4 +1,4 @@
-module github.com/code-ready/machine-driver-vz
+module github.com/code-ready/machine-driver-vf
 
 go 1.16
 

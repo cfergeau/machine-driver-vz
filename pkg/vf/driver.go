@@ -16,15 +16,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vz
+package vf
 
 import (
-	vzdriver "github.com/code-ready/machine/drivers/vz"
+	vfdriver "github.com/code-ready/machine/drivers/vf"
 	"github.com/code-ready/machine/libmachine/state"
 	"github.com/code-ready/machine/libmachine/drivers"
 )
 
-type Driver vzdriver.Driver
+type Driver vfdriver.Driver
 
 func NewDriver() *Driver {
 	return &Driver{

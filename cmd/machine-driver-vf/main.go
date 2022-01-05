@@ -42,7 +42,7 @@ func setNonCanonicalMode(f *os.File) {
 }
 
 func convertDiskImage(bundleInfo *bundle.CrcBundleInfo) (string, error) {
-	rawName := bundleInfo.GetDiskImagePath() + ".vz.raw"
+	rawName := bundleInfo.GetDiskImagePath() + ".vf.raw"
 	if _, err := os.Stat(rawName); err == nil {
 		return rawName, nil
 	}

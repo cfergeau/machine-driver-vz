@@ -1,7 +1,7 @@
-package vz
+package vf
 
 const (
-	DriverName    = "vz"
+	DriverName    = "vf"
 	DriverVersion = "0.14.0"
 
 	DefaultMemory  = 8192
