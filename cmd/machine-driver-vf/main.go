@@ -222,11 +222,11 @@ func main() {
 	vm := vz.NewVirtualMachine(config)
 	_ = vm
 	go func(vm *vz.VirtualMachine) {
-		t := time.NewTicker(time.Second)
+		ticker := time.NewTicker(time.Second)
 		defer t.Stop()
 		for {
 			select {
-			case <-t.C:
+			case <-ticker.C:
 			case newState := <-vm.StateChangedNotify():
 				log.Println(
 					"newState:", newState,
