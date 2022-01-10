@@ -21,25 +21,33 @@ package vf
 import (
 	"errors"
 	"fmt"
+	"net"
+	"os/exec"
 	"time"
 
 	"github.com/Code-Hex/vz"
+	crcos "github.com/code-ready/crc/pkg/os"
 	vfdriver "github.com/code-ready/machine/drivers/vf"
 	"github.com/code-ready/machine/libmachine/drivers"
 	"github.com/code-ready/machine/libmachine/state"
 	log "github.com/sirupsen/logrus"
 )
 
-type Driver vfdriver.Driver
+type Driver struct {
+	vfdriver.Driver
+	vzVirtualMachine *vz.VirtualMachine
+}
 
 func NewDriver() *Driver {
 	// checks that vfdriver.Driver implements the libmachine.Driver interface
 	var _ drivers.Driver = &Driver{}
 	return &Driver{
-		VMDriver: &drivers.VMDriver{
-			BaseDriver: &drivers.BaseDriver{},
-			CPU:        DefaultCPUs,
-			Memory:     DefaultMemory,
+		Driver: vfdriver.Driver{
+			VMDriver: &drivers.VMDriver{
+				BaseDriver: &drivers.BaseDriver{},
+				CPU:        DefaultCPUs,
+				Memory:     DefaultMemory,
+			},
 		},
 	}
 }
@@ -71,14 +79,31 @@ func (d *Driver) PreCreateCheck() error {
 	return nil
 }
 
+func (d *Driver) getDiskPath() string {
+	return d.ResolveStorePath(fmt.Sprintf("%s.img", d.MachineName))
+}
+
 // Create a host using the driver's config
 func (d *Driver) Create() error {
 	if err := d.PreCreateCheck(); err != nil {
 		return err
 	}
 
-	// copy disk image in the right place
-	// resize disk
+	// use qemu-img for now for the conversion, but we need to remove this dependency
+	qemuImgPath, err := exec.LookPath("qemu-img")
+	if err != nil {
+		log.Println("Could not find the qemu-img execurable in $PATH, please install it using 'brew install qemu'")
+		return err
+	}
+
+	log.Println("Converting disk image")
+	stdout, stderr, err := crcos.RunWithDefaultLocale(qemuImgPath, "convert", "-f", d.ImageFormat, "-O", "raw", d.ImageSourcePath, d.getDiskPath())
+	if err != nil {
+		log.Println("RunWithDefaultLocale error: %s %s\n", stdout, stderr)
+		return err
+	}
+
+	// TODO: resize disk
 	return nil
 }
 
@@ -93,24 +118,34 @@ func (d *Driver) Start() error {
 	config := vz.NewVirtualMachineConfiguration(
 		bootLoader,
 		uint(d.CPU),
-		uint64(d.Memory),
+		uint64(d.Memory*1024*1024),
 	)
 
 	// console
-	/*
-		serialPortAttachment := vz.NewFileHandleSerialPortAttachment(os.Stdin, tty)
-		consoleConfig := vz.NewVirtioConsoleDeviceSerialPortConfiguration(serialPortAttachment)
-		config.SetSerialPortsVirtualMachineConfiguration([]*vz.VirtioConsoleDeviceSerialPortConfiguration{
-			consoleConfig,
-		})
-	*/
+	logFile := d.ResolveStorePath(fmt.Sprintf("%s.log", d.MachineName))
+	serialPortAttachment := vz.NewFileSerialPortAttachment(logFile, false)
+	//serialPortAttachment := vz.NewFileHandleSerialPortAttachment(os.Stdin, tty)
+	consoleConfig := vz.NewVirtioConsoleDeviceSerialPortConfiguration(serialPortAttachment)
+	config.SetSerialPortsVirtualMachineConfiguration([]*vz.VirtioConsoleDeviceSerialPortConfiguration{
+		consoleConfig,
+	})
 
 	// network
-	natAttachment := vz.NewNATNetworkDeviceAttachment()
-	networkConfig := vz.NewVirtioNetworkDeviceConfiguration(natAttachment)
-	config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{
-		networkConfig,
-	})
+	mac := "52:fd:fc:07:21:82"
+	if d.VMNet {
+		hardwareAddr, err := net.ParseMac(mac)
+		if err != nil {
+			return err
+		}
+		macAddress := vz.NewMACAddress(hardwareAddr)
+
+		natAttachment := vz.NewNATNetworkDeviceAttachment()
+		networkConfig := vz.NewVirtioNetworkDeviceConfiguration(natAttachment)
+		networkConfig.SetMacAddress(macAddress)
+		config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{
+			networkConfig,
+		})
+	}
 
 	// entropy
 	entropyConfig := vz.NewVirtioEntropyDeviceConfiguration()
@@ -119,7 +154,7 @@ func (d *Driver) Start() error {
 	})
 
 	// disk
-	diskPath := d.ResolveStorePath(fmt.Sprintf("%s.%s", d.MachineName, d.ImageFormat))
+	diskPath := d.getDiskPath()
 
 	diskImageAttachment, err := vz.NewDiskImageStorageDeviceAttachment(
 		diskPath,
@@ -147,6 +182,7 @@ func (d *Driver) Start() error {
 	}
 
 	vm := vz.NewVirtualMachine(config)
+	d.vzVirtualMachine = vm
 	/*
 		go func(vm *vz.VirtualMachine) {
 			ticker := time.NewTicker(time.Second)
@@ -174,17 +210,43 @@ func (d *Driver) Start() error {
 		if err != nil {
 			errCh <- err
 		}
-		select {
-		case newState := <-vm.StateChangedNotify():
-			if newState == vz.VirtualMachineStateRunning {
-				errCh <- nil
+	loop:
+		for {
+			select {
+			case newState := <-vm.StateChangedNotify():
+				if newState == vz.VirtualMachineStateRunning {
+					errCh <- nil
+					break loop
+				}
+			case <-time.After(5 * time.Second):
+				errCh <- errors.New("virtual machine failed to start")
+				break loop
 			}
-		case <-time.After(5 * time.Second):
-			errCh <- errors.New("virtual machine failed to start")
 		}
 	})
 
-	return <-errCh
+	err = <-errCh
+	if err != nil {
+		return err
+	}
+	if !d.VMNet {
+		return nil
+	}
+
+	getIP := func() error {
+		d.IPAddress, err = GetIPAddressByMACAddress(mac)
+		if err != nil {
+			return &RetriableError{Err: err}
+		}
+		return nil
+	}
+
+	if err := RetryAfter(60, getIP, 2*time.Second); err != nil {
+		return fmt.Errorf("IP address never found in dhcp leases file %v", err)
+	}
+	log.Debugf("IP: %s", d.IPAddress)
+
+	return nil
 }
 
 func vzStateToState(vzState vz.VirtualMachineState) state.State {
@@ -212,9 +274,10 @@ func vzStateToState(vzState vz.VirtualMachineState) state.State {
 
 // GetState returns the state that the host is in (running, stopped, etc)
 func (d *Driver) GetState() (state.State, error) {
-	var vm *vz.VirtualMachine
-
-	return vzStateToState(vm.State()), nil
+	if d.vzVirtualMachine == nil {
+		return state.Stopped, nil
+	}
+	return vzStateToState(d.vzVirtualMachine.State()), nil
 }
 
 // Kill stops a host forcefully
@@ -234,7 +297,6 @@ func (d *Driver) UpdateConfigRaw(rawDriver []byte) error {
 
 // Stop a host gracefully
 func (d *Driver) Stop() error {
-	var vm *vz.VirtualMachine
 	st, err := d.GetState()
 	if err != nil {
 		return err
@@ -242,7 +304,7 @@ func (d *Driver) Stop() error {
 	if st == state.Stopped {
 		return nil
 	}
-	stopped, err := vm.RequestStop()
+	stopped, err := d.vzVirtualMachine.RequestStop()
 	if err != nil {
 		log.Warnf("Failed to stop VM")
 		return err

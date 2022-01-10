@@ -14,6 +14,7 @@ require (
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/pkg/term v1.1.0
 	github.com/rs/xid v1.3.0 // indirect
+	github.com/sirupsen/logrus v1.8.1 // indirect
 	golang.org/x/sys v0.0.0-20210823070655-63515b42dcdf
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
 	golang.org/x/text v0.3.7 // indirect
