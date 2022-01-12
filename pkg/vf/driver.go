@@ -132,20 +132,20 @@ func (d *Driver) Start() error {
 
 	// network
 	mac := "52:fd:fc:07:21:82"
-	if d.VMNet {
-		hardwareAddr, err := net.ParseMac(mac)
-		if err != nil {
-			return err
-		}
-		macAddress := vz.NewMACAddress(hardwareAddr)
-
-		natAttachment := vz.NewNATNetworkDeviceAttachment()
-		networkConfig := vz.NewVirtioNetworkDeviceConfiguration(natAttachment)
-		networkConfig.SetMacAddress(macAddress)
-		config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{
-			networkConfig,
-		})
+	//if d.VMNet {
+	hardwareAddr, err := net.ParseMAC(mac)
+	if err != nil {
+		return err
 	}
+	macAddress := vz.NewMACAddress(hardwareAddr)
+
+	natAttachment := vz.NewNATNetworkDeviceAttachment()
+	networkConfig := vz.NewVirtioNetworkDeviceConfiguration(natAttachment)
+	networkConfig.SetMacAddress(macAddress)
+	config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{
+		networkConfig,
+	})
+	//}
 
 	// entropy
 	entropyConfig := vz.NewVirtioEntropyDeviceConfiguration()
@@ -229,9 +229,11 @@ func (d *Driver) Start() error {
 	if err != nil {
 		return err
 	}
-	if !d.VMNet {
-		return nil
-	}
+	/*
+		if !d.VMNet {
+			return nil
+		}
+	*/
 
 	getIP := func() error {
 		d.IPAddress, err = GetIPAddressByMACAddress(mac)
