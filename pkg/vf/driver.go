@@ -21,7 +21,6 @@ package vf
 import (
 	"errors"
 	"fmt"
-	"net"
 	"os/exec"
 	"time"
 
@@ -111,7 +110,7 @@ func (d *Driver) Create() error {
 func (d *Driver) Start() error {
 	bootLoader := vz.NewLinuxBootLoader(
 		d.VmlinuzPath,
-		vz.WithCommandLine("console=hvc0 irqfixup "+d.Cmdline),
+		vz.WithCommandLine("console=hvc0 "+d.Cmdline),
 		vz.WithInitrd(d.InitrdPath),
 	)
 	log.Println("bootloader:", bootLoader)
@@ -135,17 +134,12 @@ func (d *Driver) Start() error {
 	})
 
 	// network
-	mac := "52:fd:fc:07:21:82"
 	//if d.VMNet {
-	hardwareAddr, err := net.ParseMAC(mac)
-	if err != nil {
-		return err
-	}
-	macAddress := vz.NewMACAddress(hardwareAddr)
 
 	natAttachment := vz.NewNATNetworkDeviceAttachment()
 	networkConfig := vz.NewVirtioNetworkDeviceConfiguration(natAttachment)
-	networkConfig.SetMacAddress(macAddress)
+	mac := vz.NewRandomLocallyAdministeredMACAddress()
+	networkConfig.SetMacAddress(mac)
 	config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{
 		networkConfig,
 	})
@@ -240,7 +234,7 @@ func (d *Driver) Start() error {
 	*/
 
 	getIP := func() error {
-		d.IPAddress, err = GetIPAddressByMACAddress(mac)
+		d.IPAddress, err = GetIPAddressByMACAddress(mac.String())
 		if err != nil {
 			return &RetriableError{Err: err}
 		}

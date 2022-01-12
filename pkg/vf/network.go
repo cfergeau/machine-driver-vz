@@ -55,6 +55,7 @@ type DHCPEntry struct {
 
 // GetIPAddressByMACAddress gets the IP address of a MAC address
 func GetIPAddressByMACAddress(mac string) (string, error) {
+	mac = trimMACAddress(mac)
 	return getIPAddressFromFile(mac, LeasesPath)
 }
 
@@ -123,8 +124,8 @@ func parseDHCPdLeasesFile(file io.Reader) ([]DHCPEntry, error) {
 }
 
 // trimMacAddress trimming "0" of the ten's digit
-func trimMacAddress(rawUUID string) string {
-	return leadingZeroRegexp.ReplaceAllString(rawUUID, "$1")
+func trimMACAddress(macAddress string) string {
+	return leadingZeroRegexp.ReplaceAllString(macAddress, "$1")
 }
 
 // GetNetAddr gets the network address for vmnet
