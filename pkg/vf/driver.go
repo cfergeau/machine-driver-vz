@@ -123,7 +123,10 @@ func (d *Driver) Start() error {
 
 	// console
 	logFile := d.ResolveStorePath(fmt.Sprintf("%s.log", d.MachineName))
-	serialPortAttachment := vz.NewFileSerialPortAttachment(logFile, false)
+	serialPortAttachment, err := vz.NewFileSerialPortAttachment(logFile, false)
+	if err != nil {
+		return err
+	}
 	//serialPortAttachment := vz.NewFileHandleSerialPortAttachment(os.Stdin, tty)
 	consoleConfig := vz.NewVirtioConsoleDeviceSerialPortConfiguration(serialPortAttachment)
 	config.SetSerialPortsVirtualMachineConfiguration([]*vz.VirtioConsoleDeviceSerialPortConfiguration{
