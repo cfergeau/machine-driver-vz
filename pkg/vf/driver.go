@@ -111,9 +111,10 @@ func (d *Driver) Create() error {
 func (d *Driver) Start() error {
 	bootLoader := vz.NewLinuxBootLoader(
 		d.VmlinuzPath,
-		vz.WithCommandLine(d.KernelCmdLine),
+		vz.WithCommandLine("console=hvc0 irqfixup "+d.Cmdline),
 		vz.WithInitrd(d.InitrdPath),
 	)
+	log.Println("bootloader:", bootLoader)
 
 	config := vz.NewVirtualMachineConfiguration(
 		bootLoader,
