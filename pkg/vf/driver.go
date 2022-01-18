@@ -135,16 +135,17 @@ func (d *Driver) Start() error {
 
 	log.Println("d.VMNet: ", d.VMNet)
 	// network
-	//if d.VMNet {
 
-	natAttachment := vz.NewNATNetworkDeviceAttachment()
-	networkConfig := vz.NewVirtioNetworkDeviceConfiguration(natAttachment)
-	mac := vz.NewRandomLocallyAdministeredMACAddress()
-	networkConfig.SetMacAddress(mac)
-	config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{
-		networkConfig,
-	})
-	//}
+	var mac *vz.MACAddress
+	if d.VMNet {
+		natAttachment := vz.NewNATNetworkDeviceAttachment()
+		networkConfig := vz.NewVirtioNetworkDeviceConfiguration(natAttachment)
+		mac = vz.NewRandomLocallyAdministeredMACAddress()
+		networkConfig.SetMacAddress(mac)
+		config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{
+			networkConfig,
+		})
+	}
 
 	// entropy
 	entropyConfig := vz.NewVirtioEntropyDeviceConfiguration()
@@ -231,11 +232,10 @@ func (d *Driver) Start() error {
 	if err := d.exposeVsock(); err != nil {
 		log.Warnf("Error listening on vsock: %v", err)
 	}
-	/*
-		if !d.VMNet {
-			return nil
-		}
-	*/
+
+	if !d.VMNet {
+		return nil
+	}
 
 	getIP := func() error {
 		d.IPAddress, err = GetIPAddressByMACAddress(mac.String())
