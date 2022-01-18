@@ -133,6 +133,7 @@ func (d *Driver) Start() error {
 		consoleConfig,
 	})
 
+	log.Println("d.VMNet: ", d.VMNet)
 	// network
 	//if d.VMNet {
 
@@ -226,6 +227,9 @@ func (d *Driver) Start() error {
 	err = <-errCh
 	if err != nil {
 		return err
+	}
+	if err := d.exposeVsock(); err != nil {
+		log.Warnf("Error listening on vsock: %v", err)
 	}
 	/*
 		if !d.VMNet {
