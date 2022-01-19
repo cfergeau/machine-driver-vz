@@ -13,7 +13,7 @@ import (
 	"inet.af/tcpproxy"
 )
 
-func (d *Driver) exposeVsock() error {
+func exposeVsock(vm *vz.VirtualMachine, vsockPath string) error {
 	var proxy tcpproxy.Proxy
 	proxy.ListenFunc = func(_, laddr string) (net.Listener, error) {
 		parsed, err := url.Parse(laddr)
@@ -26,7 +26,7 @@ func (d *Driver) exposeVsock() error {
 			if err != nil {
 				return nil, err
 			}
-			socketDevices := d.vzVirtualMachine.SocketDevices()
+			socketDevices := vm.SocketDevices()
 			if len(socketDevices) != 1 {
 				return nil, fmt.Errorf("VM has too many/not enough virtio-vsock devices (%d)", len(socketDevices))
 			}
@@ -37,7 +37,7 @@ func (d *Driver) exposeVsock() error {
 	}
 
 	proxy.AddRoute("vsock://:1024", &tcpproxy.DialProxy{
-		Addr: fmt.Sprintf("unix:%s", d.VsockPath),
+		Addr: fmt.Sprintf("unix:%s", vsockPath),
 		DialContext: func(ctx context.Context, network, addr string) (conn net.Conn, e error) {
 			fmt.Println("DialContext:", network, addr)
 			parsed, err := url.Parse(addr)
