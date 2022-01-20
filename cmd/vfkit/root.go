@@ -17,7 +17,7 @@ var rootCmd = &cobra.Command{
 	Long: `A hypervisor written in Go using Apple's virtualization framework to run linux virtual machines.
                 Complete documentation is available at https://github.com/code-ready/vfkit`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, err := newVirtualMachine(opts)
+		vm, err := newVirtualMachine(opts)
 		if err != nil {
 			return err
 		}

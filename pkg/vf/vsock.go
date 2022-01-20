@@ -13,7 +13,7 @@ import (
 	"inet.af/tcpproxy"
 )
 
-func exposeVsock(vm *vz.VirtualMachine, vsockPath string) error {
+func ExposeVsock(vm *vz.VirtualMachine, vsockPath string) error {
 	var proxy tcpproxy.Proxy
 	proxy.ListenFunc = func(_, laddr string) (net.Listener, error) {
 		parsed, err := url.Parse(laddr)

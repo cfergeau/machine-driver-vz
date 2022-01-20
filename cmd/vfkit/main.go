@@ -21,8 +21,10 @@ package main
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/Code-Hex/vz"
+	"github.com/code-ready/machine-driver-vf/pkg/vf"
 	"github.com/docker/go-units"
 	log "github.com/sirupsen/logrus"
 )
@@ -46,7 +48,7 @@ type cmdlineOptions struct {
 	vsockSocketPath string
 }
 
-type virtualMachine *vz.VirtualMachine
+//type virtualMachine *vz.VirtualMachine
 
 func addLogFile(vmConfig *vz.VirtualMachineConfiguration, logFile string) error {
 	//serialPortAttachment := vz.NewFileHandleSerialPortAttachment(os.Stdin, tty)
@@ -184,7 +186,7 @@ func createVMConfiguration(opts *cmdlineOptions) (*vz.VirtualMachineConfiguratio
 	return vmConfig, nil
 }
 
-func newVirtualMachine(opts *cmdlineOptions) (virtualMachine, error) {
+func newVirtualMachine(opts *cmdlineOptions) (*vz.VirtualMachine, error) {
 	vmConfig, err := createVMConfiguration(opts)
 	if err != nil {
 		return nil, err
@@ -192,36 +194,45 @@ func newVirtualMachine(opts *cmdlineOptions) (virtualMachine, error) {
 
 	vm := vz.NewVirtualMachine(vmConfig)
 	return vm, nil
-	/*
-		d.vzVirtualMachine = vm
+}
 
-		errCh := make(chan error, 1)
-		vm.Start(func(err error) {
-			log.Println("in start:", err)
-			if err != nil {
-				errCh <- err
+func waitForVMState(vm *vz.VirtualMachine, state vz.VirtualMachineState) error {
+	for {
+		select {
+		case newState := <-vm.StateChangedNotify():
+			if newState == state {
+				return nil
 			}
-		loop:
-			for {
-				select {
-				case newState := <-vm.StateChangedNotify():
-					if newState == vz.VirtualMachineStateRunning {
-						errCh <- nil
-						break loop
-					}
-				case <-time.After(5 * time.Second):
-					errCh <- errors.New("virtual machine failed to start")
-					break loop
-				}
-			}
-		})
+		case <-time.After(5 * time.Second):
+			return fmt.Errorf("timeout waiting for VM state %v", state)
+		}
+	}
+}
 
-		err = <-errCh
+func runVirtualMachine(vm *vz.VirtualMachine) error {
+	errCh := make(chan error, 1)
+	vm.Start(func(err error) {
 		if err != nil {
-			return err
+			errCh <- err
 		}
-		if err := exposeVsock(vm, opts.vsockSocketPath); err != nil {
-			log.Warnf("Error listening on vsock: %v", err)
+		errCh <- waitForVMState(vm, vz.VirtualMachineStateRunning)
+	})
+
+	err := <-errCh
+	if err != nil {
+		return err
+	}
+	log.Infof("virtual machine is running")
+	if err := vf.ExposeVsock(vm, opts.vsockSocketPath); err != nil {
+		log.Warnf("error listening on vsock: %v", err)
+	}
+	log.Infof("waiting for VM to stop")
+	for {
+		err := waitForVMState(vm, vz.VirtualMachineStateStopped)
+		if err == nil {
+			log.Infof("VM is stopped")
+			return nil
 		}
-	*/
+	}
+
 }
