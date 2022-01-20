@@ -6,12 +6,12 @@ require (
 	github.com/Code-Hex/vz v0.0.5-0.20211218053248-d70a0533bf8e
 	github.com/code-ready/crc v1.31.2
 	github.com/code-ready/machine v0.0.0-20210616065635-eff475d32b9a
-	github.com/mattn/go-isatty v0.0.13 // indirect
+	github.com/docker/go-units v0.4.0
 	github.com/rs/xid v1.3.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
+	github.com/spf13/cobra v1.3.0
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
-	golang.org/x/text v0.3.7 // indirect
 	inet.af/tcpproxy v0.0.0-20210824174053-2e577fef49e2
 )
 

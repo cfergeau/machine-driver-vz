@@ -23,25 +23,29 @@ import (
 	"net"
 
 	"github.com/Code-Hex/vz"
+	"github.com/docker/go-units"
 )
 
 type cmdlineOptions struct {
-	vcpus       uint
-	memoryBytes uint64
+	vcpus     uint
+	memoryMiB uint
 
 	vmlinuzPath   string
 	kernelCmdline string
 	initrdPath    string
 
-	macAddress  string
-	logFilePath string
+	natNetworking bool
+	macAddress    string
+	logFilePath   string
 
-	entropyDevice bool
+	rngDevice bool
 
 	diskPath string
 
 	vsockSocketPath string
 }
+
+type virtualMachine *vz.VirtualMachine
 
 func addLogFile(vmConfig *vz.VirtualMachineConfiguration, logFile string) error {
 	//serialPortAttachment := vz.NewFileHandleSerialPortAttachment(os.Stdin, tty)
@@ -120,7 +124,7 @@ func createVMConfiguration(opts *cmdlineOptions) (*vz.VirtualMachineConfiguratio
 	vmConfig := vz.NewVirtualMachineConfiguration(
 		bootLoader,
 		opts.vcpus,
-		opts.memoryBytes,
+		uint64(opts.memoryMiB*units.MiB),
 	)
 
 	if opts.logFilePath != "" {
@@ -129,11 +133,13 @@ func createVMConfiguration(opts *cmdlineOptions) (*vz.VirtualMachineConfiguratio
 		}
 	}
 
-	if err := addNetworkNAT(vmConfig, opts.macAddress); err != nil {
-		return nil, err
+	if opts.natNetworking {
+		if err := addNetworkNAT(vmConfig, opts.macAddress); err != nil {
+			return nil, err
+		}
 	}
 
-	if opts.entropyDevice {
+	if opts.rngDevice {
 		if err := addEntropy(vmConfig); err != nil {
 			return nil, err
 		}
@@ -162,15 +168,14 @@ func createVMConfiguration(opts *cmdlineOptions) (*vz.VirtualMachineConfiguratio
 	return vmConfig, nil
 }
 
-func main() {
-	opts := &cmdlineOptions{}
-
+func newVirtualMachine(opts *cmdlineOptions) (virtualMachine, error) {
 	vmConfig, err := createVMConfiguration(opts)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	_ = vz.NewVirtualMachine(vmConfig)
+	vm := vz.NewVirtualMachine(vmConfig)
+	return vm, nil
 	/*
 		d.vzVirtualMachine = vm
 
