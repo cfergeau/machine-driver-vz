@@ -24,6 +24,7 @@ import (
 
 	"github.com/Code-Hex/vz"
 	"github.com/docker/go-units"
+	log "github.com/sirupsen/logrus"
 )
 
 type cmdlineOptions struct {
@@ -115,43 +116,58 @@ func addVirtioVsock(vmConfig *vz.VirtualMachineConfiguration) error {
 }
 
 func createVMConfiguration(opts *cmdlineOptions) (*vz.VirtualMachineConfiguration, error) {
+	log.Info(opts)
 	bootLoader := vz.NewLinuxBootLoader(
 		opts.vmlinuzPath,
 		vz.WithCommandLine(opts.kernelCmdline),
 		vz.WithInitrd(opts.initrdPath),
 	)
+	log.Info("boot parameters:")
+	log.Infof("\tkernel: %s", opts.vmlinuzPath)
+	log.Infof("\tkernel command line:%s", opts.kernelCmdline)
+	log.Infof("\tinitrd: %s", opts.initrdPath)
+	log.Info()
 
 	vmConfig := vz.NewVirtualMachineConfiguration(
 		bootLoader,
 		opts.vcpus,
 		uint64(opts.memoryMiB*units.MiB),
 	)
+	log.Info("virtual machine parameters:")
+	log.Infof("\tvCPUs: %d", opts.vcpus)
+	log.Infof("\tmemory: %d MiB", opts.memoryMiB)
+	log.Info()
 
 	if opts.logFilePath != "" {
+		log.Infof("sending VM output to %s", opts.logFilePath)
 		if err := addLogFile(vmConfig, opts.logFilePath); err != nil {
 			return nil, err
 		}
 	}
 
 	if opts.natNetworking {
+		log.Infof("adding virtio-net device (mac: %s)", opts.macAddress)
 		if err := addNetworkNAT(vmConfig, opts.macAddress); err != nil {
 			return nil, err
 		}
 	}
 
 	if opts.rngDevice {
+		log.Infof("adding virtio-rng device")
 		if err := addEntropy(vmConfig); err != nil {
 			return nil, err
 		}
 	}
 
 	if opts.diskPath != "" {
+		log.Infof("adding disk image %s", opts.diskPath)
 		if err := addDisk(vmConfig, opts.diskPath); err != nil {
 			return nil, err
 		}
 	}
 
 	if opts.vsockSocketPath != "" {
+		log.Infof("adding virtio-vsock device at %s", opts.vsockSocketPath)
 		if err := addVirtioVsock(vmConfig); err != nil {
 			return nil, err
 		}
