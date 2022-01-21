@@ -24,7 +24,6 @@ import (
 
 	"github.com/Code-Hex/vz"
 	"github.com/code-ready/machine-driver-vf/pkg/config"
-	"github.com/code-ready/machine-driver-vf/pkg/vf"
 	"github.com/docker/go-units"
 	log "github.com/sirupsen/logrus"
 )
@@ -115,9 +114,11 @@ func runVirtualMachine(vm *vz.VirtualMachine) error {
 		return err
 	}
 	log.Infof("virtual machine is running")
-	if err := vf.ExposeVsock(vm, opts.vsockSocketPath); err != nil {
-		log.Warnf("error listening on vsock: %v", err)
-	}
+	/*
+		if err := vf.ExposeVsock(vm, opts.vsockSocketPath); err != nil {
+			log.Warnf("error listening on vsock: %v", err)
+		}
+	*/
 	log.Infof("waiting for VM to stop")
 	for {
 		err := waitForVMState(vm, vz.VirtualMachineStateStopped)
