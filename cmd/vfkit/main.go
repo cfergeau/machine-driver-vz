@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/Code-Hex/vz"
+	"github.com/code-ready/machine-driver-vf/pkg/config"
 	"github.com/code-ready/machine-driver-vf/pkg/vf"
 	"github.com/docker/go-units"
 	log "github.com/sirupsen/logrus"
@@ -37,9 +38,12 @@ type cmdlineOptions struct {
 	kernelCmdline string
 	initrdPath    string
 
+	devices []string
+
 	natNetworking bool
 	macAddress    string
-	logFilePath   string
+
+	logFilePath string
 
 	rngDevice bool
 
@@ -47,8 +51,6 @@ type cmdlineOptions struct {
 
 	vsockSocketPath string
 }
-
-//type virtualMachine *vz.VirtualMachine
 
 func addLogFile(vmConfig *vz.VirtualMachineConfiguration, logFile string) error {
 	//serialPortAttachment := vz.NewFileHandleSerialPortAttachment(os.Stdin, tty)
@@ -140,40 +142,46 @@ func createVMConfiguration(opts *cmdlineOptions) (*vz.VirtualMachineConfiguratio
 	log.Infof("\tmemory: %d MiB", opts.memoryMiB)
 	log.Info()
 
-	if opts.logFilePath != "" {
-		log.Infof("sending VM output to %s", opts.logFilePath)
-		if err := addLogFile(vmConfig, opts.logFilePath); err != nil {
-			return nil, err
-		}
+	if err := config.AddDevicesFromCmdLine(opts.devices, vmConfig); err != nil {
+		return nil, err
 	}
 
-	if opts.natNetworking {
-		log.Infof("adding virtio-net device (mac: %s)", opts.macAddress)
-		if err := addNetworkNAT(vmConfig, opts.macAddress); err != nil {
-			return nil, err
+	/*
+		if opts.logFilePath != "" {
+			log.Infof("sending VM output to %s", opts.logFilePath)
+			if err := addLogFile(vmConfig, opts.logFilePath); err != nil {
+				return nil, err
+			}
 		}
-	}
 
-	if opts.rngDevice {
-		log.Infof("adding virtio-rng device")
-		if err := addEntropy(vmConfig); err != nil {
-			return nil, err
+		if opts.natNetworking {
+			log.Infof("adding virtio-net device (mac: %s)", opts.macAddress)
+			if err := addNetworkNAT(vmConfig, opts.macAddress); err != nil {
+				return nil, err
+			}
 		}
-	}
 
-	if opts.diskPath != "" {
-		log.Infof("adding disk image %s", opts.diskPath)
-		if err := addDisk(vmConfig, opts.diskPath); err != nil {
-			return nil, err
+		if opts.rngDevice {
+			log.Infof("adding virtio-rng device")
+			if err := addEntropy(vmConfig); err != nil {
+				return nil, err
+			}
 		}
-	}
 
-	if opts.vsockSocketPath != "" {
-		log.Infof("adding virtio-vsock device at %s", opts.vsockSocketPath)
-		if err := addVirtioVsock(vmConfig); err != nil {
-			return nil, err
+		if opts.diskPath != "" {
+			log.Infof("adding disk image %s", opts.diskPath)
+			if err := addDisk(vmConfig, opts.diskPath); err != nil {
+				return nil, err
+			}
 		}
-	}
+
+		if opts.vsockSocketPath != "" {
+			log.Infof("adding virtio-vsock device at %s", opts.vsockSocketPath)
+			if err := addVirtioVsock(vmConfig); err != nil {
+				return nil, err
+			}
+		}
+	*/
 
 	valid, err := vmConfig.Validate()
 	if err != nil {

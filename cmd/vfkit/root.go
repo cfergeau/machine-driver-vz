@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -18,10 +17,6 @@ var rootCmd = &cobra.Command{
 	Long: `A hypervisor written in Go using Apple's virtualization framework to run linux virtual machines.
                 Complete documentation is available at https://github.com/code-ready/vfkit`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		for _, dev := range deviceList {
-			log.Infof("found device %s", dev)
-		}
-		return nil
 		vm, err := newVirtualMachine(opts)
 		if err != nil {
 			return err
@@ -30,8 +25,6 @@ var rootCmd = &cobra.Command{
 	},
 	Version: vfkitVersion,
 }
-
-var deviceList []string
 
 func init() {
 	rootCmd.Flags().StringVarP(&opts.vmlinuzPath, "kernel", "k", "", "path to the virtual machine linux kernel")
@@ -56,7 +49,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&opts.rngDevice, "rng", "r", false, "add RNG device")
 	rootCmd.Flags().StringVarP(&opts.logFilePath, "log-file", "l", "", "path to log file for virtual machine console output")
 
-	rootCmd.Flags().StringArrayVarP(&deviceList, "device", "x", "", "devices")
+	rootCmd.Flags().StringArrayVarP(&opts.devices, "device", "d", []string{}, "devices")
 }
 
 func Execute() {
