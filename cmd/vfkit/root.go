@@ -38,17 +38,6 @@ func init() {
 	// FIXME: use go-units for parsing
 	rootCmd.Flags().UintVarP(&opts.memoryMiB, "memory", "m", 512, "virtual machine RAM size in mibibytes")
 
-	// should all the options below become -s virtio-blk,options -s virtio-rng,options -s virtio-sock,options ? limits the amount of options, and should be more flexible when additional parameters are needed (virtio-vsock port, macaddress, ...)
-	rootCmd.Flags().StringVarP(&opts.diskPath, "disk", "d", "", "path to the virtual machine raw disk image")
-	// FIXME: missing port number
-	rootCmd.Flags().StringVarP(&opts.vsockSocketPath, "virtio-vsock", "V", "", "path to the unix socket for virtio-vsock communication")
-
-	// FIXME: move this to -n nat,macaddress?
-	rootCmd.Flags().StringVarP(&opts.macAddress, "mac-address", "M", "", "virtual machine MAC address")
-	rootCmd.Flags().BoolVarP(&opts.natNetworking, "nat", "n", false, "use NAT networking")
-	rootCmd.Flags().BoolVarP(&opts.rngDevice, "rng", "r", false, "add RNG device")
-	rootCmd.Flags().StringVarP(&opts.logFilePath, "log-file", "l", "", "path to log file for virtual machine console output")
-
 	rootCmd.Flags().StringArrayVarP(&opts.devices, "device", "d", []string{}, "devices")
 }
 

@@ -20,7 +20,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/Code-Hex/vz"
@@ -39,84 +38,6 @@ type cmdlineOptions struct {
 	initrdPath    string
 
 	devices []string
-
-	natNetworking bool
-	macAddress    string
-
-	logFilePath string
-
-	rngDevice bool
-
-	diskPath string
-
-	vsockSocketPath string
-}
-
-func addLogFile(vmConfig *vz.VirtualMachineConfiguration, logFile string) error {
-	//serialPortAttachment := vz.NewFileHandleSerialPortAttachment(os.Stdin, tty)
-	serialPortAttachment, err := vz.NewFileSerialPortAttachment(logFile, false)
-	if err != nil {
-		return err
-	}
-	consoleConfig := vz.NewVirtioConsoleDeviceSerialPortConfiguration(serialPortAttachment)
-	vmConfig.SetSerialPortsVirtualMachineConfiguration([]*vz.VirtioConsoleDeviceSerialPortConfiguration{
-		consoleConfig,
-	})
-
-	return nil
-}
-
-func addNetworkNAT(vmConfig *vz.VirtualMachineConfiguration, macAddress string) error {
-	var mac *vz.MACAddress
-	if macAddress == "" {
-		mac = vz.NewRandomLocallyAdministeredMACAddress()
-	} else {
-		hwAddr, err := net.ParseMAC(macAddress)
-		if err != nil {
-			return err
-		}
-		mac = vz.NewMACAddress(hwAddr)
-	}
-	natAttachment := vz.NewNATNetworkDeviceAttachment()
-	networkConfig := vz.NewVirtioNetworkDeviceConfiguration(natAttachment)
-	networkConfig.SetMacAddress(mac)
-	vmConfig.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{
-		networkConfig,
-	})
-
-	return nil
-}
-
-func addEntropy(vmConfig *vz.VirtualMachineConfiguration) error {
-	entropyConfig := vz.NewVirtioEntropyDeviceConfiguration()
-	vmConfig.SetEntropyDevicesVirtualMachineConfiguration([]*vz.VirtioEntropyDeviceConfiguration{
-		entropyConfig,
-	})
-
-	return nil
-}
-
-func addDisk(vmConfig *vz.VirtualMachineConfiguration, diskPath string) error {
-	diskImageAttachment, err := vz.NewDiskImageStorageDeviceAttachment(
-		diskPath,
-		false,
-	)
-	if err != nil {
-		return err
-	}
-	storageDeviceConfig := vz.NewVirtioBlockDeviceConfiguration(diskImageAttachment)
-	vmConfig.SetStorageDevicesVirtualMachineConfiguration([]vz.StorageDeviceConfiguration{
-		storageDeviceConfig,
-	})
-	return nil
-}
-
-func addVirtioVsock(vmConfig *vz.VirtualMachineConfiguration) error {
-	vmConfig.SetSocketDevicesVirtualMachineConfiguration([]vz.SocketDeviceConfiguration{
-		vz.NewVirtioSocketDeviceConfiguration(),
-	})
-
-	return nil
 }
 
 func createVMConfiguration(opts *cmdlineOptions) (*vz.VirtualMachineConfiguration, error) {
@@ -145,43 +66,6 @@ func createVMConfiguration(opts *cmdlineOptions) (*vz.VirtualMachineConfiguratio
 	if err := config.AddDevicesFromCmdLine(opts.devices, vmConfig); err != nil {
 		return nil, err
 	}
-
-	/*
-		if opts.logFilePath != "" {
-			log.Infof("sending VM output to %s", opts.logFilePath)
-			if err := addLogFile(vmConfig, opts.logFilePath); err != nil {
-				return nil, err
-			}
-		}
-
-		if opts.natNetworking {
-			log.Infof("adding virtio-net device (mac: %s)", opts.macAddress)
-			if err := addNetworkNAT(vmConfig, opts.macAddress); err != nil {
-				return nil, err
-			}
-		}
-
-		if opts.rngDevice {
-			log.Infof("adding virtio-rng device")
-			if err := addEntropy(vmConfig); err != nil {
-				return nil, err
-			}
-		}
-
-		if opts.diskPath != "" {
-			log.Infof("adding disk image %s", opts.diskPath)
-			if err := addDisk(vmConfig, opts.diskPath); err != nil {
-				return nil, err
-			}
-		}
-
-		if opts.vsockSocketPath != "" {
-			log.Infof("adding virtio-vsock device at %s", opts.vsockSocketPath)
-			if err := addVirtioVsock(vmConfig); err != nil {
-				return nil, err
-			}
-		}
-	*/
 
 	valid, err := vmConfig.Validate()
 	if err != nil {
