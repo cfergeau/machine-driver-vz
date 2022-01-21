@@ -24,6 +24,7 @@ import (
 
 	"github.com/Code-Hex/vz"
 	"github.com/code-ready/machine-driver-vf/pkg/config"
+	"github.com/code-ready/machine-driver-vf/pkg/vf"
 	"github.com/docker/go-units"
 	log "github.com/sirupsen/logrus"
 )
@@ -39,12 +40,12 @@ type cmdlineOptions struct {
 	devices []string
 }
 
-func createVMConfiguration(opts *cmdlineOptions) (*vz.VirtualMachineConfiguration, error) {
+func newVMConfiguration(opts *cmdlineOptions) (*config.VirtualMachine, error) {
 	log.Info(opts)
-	bootLoader := vz.NewLinuxBootLoader(
+	bootLoader := config.NewBootloader(
 		opts.vmlinuzPath,
-		vz.WithCommandLine(opts.kernelCmdline),
-		vz.WithInitrd(opts.initrdPath),
+		opts.kernelCmdline,
+		opts.initrdPath,
 	)
 	log.Info("boot parameters:")
 	log.Infof("\tkernel: %s", opts.vmlinuzPath)
@@ -52,39 +53,21 @@ func createVMConfiguration(opts *cmdlineOptions) (*vz.VirtualMachineConfiguratio
 	log.Infof("\tinitrd: %s", opts.initrdPath)
 	log.Info()
 
-	vmConfig := vz.NewVirtualMachineConfiguration(
-		bootLoader,
+	vmConfig := config.NewVirtualMachine(
 		opts.vcpus,
 		uint64(opts.memoryMiB*units.MiB),
+		bootLoader,
 	)
 	log.Info("virtual machine parameters:")
 	log.Infof("\tvCPUs: %d", opts.vcpus)
 	log.Infof("\tmemory: %d MiB", opts.memoryMiB)
 	log.Info()
 
-	if err := config.AddDevicesFromCmdLine(opts.devices, vmConfig); err != nil {
+	if err := vmConfig.AddDevicesFromCmdLine(opts.devices); err != nil {
 		return nil, err
-	}
-
-	valid, err := vmConfig.Validate()
-	if err != nil {
-		return nil, err
-	}
-	if !valid {
-		return nil, fmt.Errorf("Invalid virtual machine configuration")
 	}
 
 	return vmConfig, nil
-}
-
-func newVirtualMachine(opts *cmdlineOptions) (*vz.VirtualMachine, error) {
-	vmConfig, err := createVMConfiguration(opts)
-	if err != nil {
-		return nil, err
-	}
-
-	vm := vz.NewVirtualMachine(vmConfig)
-	return vm, nil
 }
 
 func waitForVMState(vm *vz.VirtualMachine, state vz.VirtualMachineState) error {
@@ -100,7 +83,19 @@ func waitForVMState(vm *vz.VirtualMachine, state vz.VirtualMachineState) error {
 	}
 }
 
-func runVirtualMachine(vm *vz.VirtualMachine) error {
+func runVirtualMachine(vmConfig *config.VirtualMachine) error {
+	vsockDevs := vmConfig.VirtioVsockDevices()
+	if len(vsockDevs) > 1 {
+		return fmt.Errorf("Can only configure one virtio-vsock device")
+	}
+
+	vzVMConfig, err := vmConfig.ToVzVirtualMachineConfig()
+	if err != nil {
+		return err
+	}
+
+	vm := vz.NewVirtualMachine(vzVMConfig)
+
 	errCh := make(chan error, 1)
 	vm.Start(func(err error) {
 		if err != nil {
@@ -109,16 +104,20 @@ func runVirtualMachine(vm *vz.VirtualMachine) error {
 		errCh <- waitForVMState(vm, vz.VirtualMachineStateRunning)
 	})
 
-	err := <-errCh
+	err = <-errCh
 	if err != nil {
 		return err
 	}
 	log.Infof("virtual machine is running")
-	/*
-		if err := vf.ExposeVsock(vm, opts.vsockSocketPath); err != nil {
+
+	if len(vsockDevs) == 1 {
+		port := vsockDevs[0].Port
+		socketURL := vsockDevs[0].SocketURL
+		log.Infof("Exposing vsock port %d on %s", port, socketURL)
+		if err := vf.ExposeVsock(vm, port, socketURL); err != nil {
 			log.Warnf("error listening on vsock: %v", err)
 		}
-	*/
+	}
 	log.Infof("waiting for VM to stop")
 	for {
 		err := waitForVMState(vm, vz.VirtualMachineStateStopped)

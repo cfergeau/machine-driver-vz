@@ -229,7 +229,7 @@ func (d *Driver) Start() error {
 	if err != nil {
 		return err
 	}
-	if err := ExposeVsock(d.vzVirtualMachine, d.VsockPath); err != nil {
+	if err := ExposeVsock(d.vzVirtualMachine, 1024, d.VsockPath); err != nil {
 		log.Warnf("Error listening on vsock: %v", err)
 	}
 

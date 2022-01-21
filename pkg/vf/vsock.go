@@ -13,7 +13,7 @@ import (
 	"inet.af/tcpproxy"
 )
 
-func ExposeVsock(vm *vz.VirtualMachine, vsockPath string) error {
+func ExposeVsock(vm *vz.VirtualMachine, port uint, vsockPath string) error {
 	var proxy tcpproxy.Proxy
 	proxy.ListenFunc = func(_, laddr string) (net.Listener, error) {
 		parsed, err := url.Parse(laddr)
@@ -36,7 +36,7 @@ func ExposeVsock(vm *vz.VirtualMachine, vsockPath string) error {
 		}
 	}
 
-	proxy.AddRoute("vsock://:1024", &tcpproxy.DialProxy{
+	proxy.AddRoute(fmt.Sprintf("vsock://:%d", port), &tcpproxy.DialProxy{
 		Addr: fmt.Sprintf("unix:%s", vsockPath),
 		DialContext: func(ctx context.Context, network, addr string) (conn net.Conn, e error) {
 			fmt.Println("DialContext:", network, addr)

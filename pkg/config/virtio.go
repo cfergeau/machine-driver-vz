@@ -15,9 +15,9 @@ type VirtioDevice interface {
 	AddToVirtualMachineConfig(*vz.VirtualMachineConfiguration) error
 }
 
-type virtioVsock struct {
-	port      uint
-	socketURL string
+type VirtioVsock struct {
+	Port      uint
+	SocketURL string
 }
 
 type virtioBlk struct {
@@ -54,27 +54,6 @@ func strToOption(str string) option {
 	return opt
 }
 
-func DevicesFromCmdLine(cmdlineOpts []string) ([]VirtioDevice, error) {
-	devs := []VirtioDevice{}
-	for _, deviceOpts := range cmdlineOpts {
-		dev, err := deviceFromCmdLine(deviceOpts)
-		if err != nil {
-			return nil, err
-		}
-		devs = append(devs, dev)
-	}
-	return devs, nil
-}
-
-func AddDevicesFromCmdLine(cmdlineOpts []string, vmConfig *vz.VirtualMachineConfiguration) error {
-	for _, deviceOpts := range cmdlineOpts {
-		if err := addDeviceFromCmdLine(deviceOpts, vmConfig); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func deviceFromCmdLine(deviceOpts string) (VirtioDevice, error) {
 	opts := strings.Split(deviceOpts, ",")
 	if len(opts) == 0 {
@@ -91,7 +70,7 @@ func deviceFromCmdLine(deviceOpts string) (VirtioDevice, error) {
 	case "virtio-serial":
 		dev = &virtioSerial{}
 	case "virtio-vsock":
-		dev = &virtioVsock{}
+		dev = &VirtioVsock{}
 	default:
 		return nil, fmt.Errorf("unknown device type: %s", opts[0])
 	}
@@ -108,14 +87,6 @@ func deviceFromCmdLine(deviceOpts string) (VirtioDevice, error) {
 	}
 
 	return dev, nil
-}
-
-func addDeviceFromCmdLine(deviceOpts string, vmConfig *vz.VirtualMachineConfiguration) error {
-	dev, err := deviceFromCmdLine(deviceOpts)
-	if err != nil {
-		return err
-	}
-	return dev.AddToVirtualMachineConfig(vmConfig)
 }
 
 func (dev *virtioSerial) FromOptions(options []option) error {
@@ -242,17 +213,17 @@ func (dev *virtioBlk) AddToVirtualMachineConfig(vmConfig *vz.VirtualMachineConfi
 	return nil
 }
 
-func (dev *virtioVsock) FromOptions(options []option) error {
+func (dev *VirtioVsock) FromOptions(options []option) error {
 	for _, option := range options {
 		switch option.key {
 		case "socketURL":
-			dev.socketURL = option.value
+			dev.SocketURL = option.value
 		case "port":
 			port, err := strconv.Atoi(option.value)
 			if err != nil {
 				return err
 			}
-			dev.port = uint(port)
+			dev.Port = uint(port)
 		default:
 			return fmt.Errorf("Unknown option for virtio-vsock devices: %s", option.key)
 		}
@@ -260,7 +231,7 @@ func (dev *virtioVsock) FromOptions(options []option) error {
 	return nil
 }
 
-func (dev *virtioVsock) AddToVirtualMachineConfig(vmConfig *vz.VirtualMachineConfiguration) error {
+func (dev *VirtioVsock) AddToVirtualMachineConfig(vmConfig *vz.VirtualMachineConfiguration) error {
 	log.Infof("Adding virtio-vsock device")
 	vmConfig.SetSocketDevicesVirtualMachineConfiguration([]vz.SocketDeviceConfiguration{
 		vz.NewVirtioSocketDeviceConfiguration(),
