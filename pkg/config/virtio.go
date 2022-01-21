@@ -54,6 +54,18 @@ func strToOption(str string) option {
 	return opt
 }
 
+func DevicesFromCmdLine(cmdlineOpts []string) ([]VirtioDevice, error) {
+	devs := []VirtioDevice{}
+	for _, deviceOpts := range cmdlineOpts {
+		dev, err := deviceFromCmdLine(deviceOpts)
+		if err != nil {
+			return nil, err
+		}
+		devs = append(devs, dev)
+	}
+	return devs, nil
+}
+
 func AddDevicesFromCmdLine(cmdlineOpts []string, vmConfig *vz.VirtualMachineConfiguration) error {
 	for _, deviceOpts := range cmdlineOpts {
 		if err := addDeviceFromCmdLine(deviceOpts, vmConfig); err != nil {
@@ -63,10 +75,10 @@ func AddDevicesFromCmdLine(cmdlineOpts []string, vmConfig *vz.VirtualMachineConf
 	return nil
 }
 
-func addDeviceFromCmdLine(deviceOpts string, vmConfig *vz.VirtualMachineConfiguration) error {
+func deviceFromCmdLine(deviceOpts string) (VirtioDevice, error) {
 	opts := strings.Split(deviceOpts, ",")
 	if len(opts) == 0 {
-		return fmt.Errorf("empty option list in command line argument")
+		return nil, fmt.Errorf("empty option list in command line argument")
 	}
 	var dev VirtioDevice
 	switch opts[0] {
@@ -81,7 +93,7 @@ func addDeviceFromCmdLine(deviceOpts string, vmConfig *vz.VirtualMachineConfigur
 	case "virtio-vsock":
 		dev = &virtioVsock{}
 	default:
-		return fmt.Errorf("unknown device type: %s", opts[0])
+		return nil, fmt.Errorf("unknown device type: %s", opts[0])
 	}
 	parsedOpts := []option{}
 	for _, opt := range opts[1:] {
@@ -92,9 +104,17 @@ func addDeviceFromCmdLine(deviceOpts string, vmConfig *vz.VirtualMachineConfigur
 	}
 
 	if err := dev.FromOptions(parsedOpts); err != nil {
-		return err
+		return nil, err
 	}
 
+	return dev, nil
+}
+
+func addDeviceFromCmdLine(deviceOpts string, vmConfig *vz.VirtualMachineConfiguration) error {
+	dev, err := deviceFromCmdLine(deviceOpts)
+	if err != nil {
+		return err
+	}
 	return dev.AddToVirtualMachineConfig(vmConfig)
 }
 
