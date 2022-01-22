@@ -15,6 +15,9 @@ type VirtioDevice interface {
 	AddToVirtualMachineConfig(*vz.VirtualMachineConfiguration) error
 }
 
+
+// TODO: Add ConnectToPort support?
+// https://github.com/Code-Hex/vz/blob/d70a0533bf8ed0fa9ab22fa4d4ca554b7c3f3ce5/socket.go#L115-L123
 type VirtioVsock struct {
 	Port      uint
 	SocketURL string
@@ -27,6 +30,12 @@ type virtioBlk struct {
 type virtioRng struct {
 }
 
+
+// TODO: Add BridgedNetwork support
+// https://github.com/Code-Hex/vz/blob/d70a0533bf8ed0fa9ab22fa4d4ca554b7c3f3ce5/network.go#L81-L82
+
+// TODO: Add FileHandleNetwork support
+// https://github.com/Code-Hex/vz/blob/d70a0533bf8ed0fa9ab22fa4d4ca554b7c3f3ce5/network.go#L109-L112
 type virtioNet struct {
 	nat        bool
 	macAddress net.HardwareAddr
@@ -35,6 +44,9 @@ type virtioNet struct {
 type virtioSerial struct {
 	logFile string
 }
+
+// TODO: Add VirtioBalloon
+// https://github.com/Code-Hex/vz/blob/master/memory_balloon.go
 
 type option struct {
 	key   string
