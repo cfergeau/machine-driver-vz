@@ -26,6 +26,7 @@ func NewBootloader(vmlinuzPath, kernelCmdLine, initrdPath string) *Bootloader {
 		initrdPath:    initrdPath,
 	}
 }
+
 func (bootloader *Bootloader) toVzBootloader() (vz.BootLoader, error) {
 	return vz.NewLinuxBootLoader(
 		bootloader.vmlinuzPath,

@@ -5,4 +5,4 @@ cmdline="console=hvc0 BOOT_IMAGE=(hd0,gpt3)/ostree/rhcos-36fd944867b0e491991a65f
 	-i ~/.crc/cache/crc_hyperkit_4.9.10/initramfs-4.18.0-305.28.1.el8_4.x86_64.img -k ~/.crc/cache/crc_hyperkit_4.9.10/vmlinuz-4.18.0-305.28.1.el8_4.x86_64 -C "$cmdline" \
 	-d virtio-net,nat \
 	-d virtio-rng \
-	-d virtio-vsock,socketURL=$HOME/.crc/machines/crc/virtio-vsock-1024.sock
+	-d virtio-vsock,port=1234,socketURL=$HOME/.crc/machines/crc/virtio-vsock-1234.sock
