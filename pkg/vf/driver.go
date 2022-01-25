@@ -19,11 +19,13 @@ limitations under the License.
 package vf
 
 import (
-	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	crcos "github.com/code-ready/crc/pkg/os"
@@ -31,6 +33,8 @@ import (
 	vfdriver "github.com/code-ready/machine/drivers/vf"
 	"github.com/code-ready/machine/libmachine/drivers"
 	"github.com/code-ready/machine/libmachine/state"
+	"github.com/mitchellh/go-ps"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -120,21 +124,44 @@ func (d *Driver) Create() error {
 	return nil
 }
 
-func startVfkit(args []string) error {
+func startVfkit(args []string) (*os.Process, error) {
 	vfkitPath, err := exec.LookPath("vfkit")
 	if err != nil {
-		return err
+		return nil, err
 	}
+	/*
+		// for debug logs of vfkit startup
+		logFile, err := os.Create("/tmp/vfkit.log")
+		if err != nil {
+			return nil, err
+		}
+		cmd.Stdout = logFile
+		cmd.Stderr = logFile
+	*/
+
 	cmd := exec.Command(vfkitPath, args...)
 	cmd.Env = os.Environ()
 	if err := cmd.Start(); err != nil {
-		return err
+		return nil, err
 	}
 	// cmd.Process.Pid
 	// cmd.Process
 	// cmd.Process.Kill()
 
-	return nil
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- cmd.Wait()
+	}()
+
+	// catch vfkit early startup failures
+	select {
+	case err := <-errCh:
+		return nil, err
+	case <-time.After(time.Second):
+		break
+	}
+
+	return cmd.Process, nil
 }
 
 // Start a host
@@ -148,12 +175,13 @@ func (d *Driver) Start() error {
 
 	vm := client.NewVirtualMachine(
 		uint(d.CPU),
-		uint64(d.Memory*1024*1024),
+		uint64(d.Memory),
 		bootLoader,
 	)
 
 	// console
-	logFile := d.ResolveStorePath(fmt.Sprintf("%s.log", d.MachineName))
+	//logFile := d.ResolveStorePath(fmt.Sprintf("%s.log", d.MachineName))
+	logFile := d.ResolveStorePath("vfkit.log")
 	dev, err := client.VirtioSerialNew(logFile)
 	if err != nil {
 		return err
@@ -168,7 +196,7 @@ func (d *Driver) Start() error {
 	// 52:54:00 is the OUI used by QEMU
 	const mac = "52:54:00:70:2b:79"
 	if d.VMNet {
-		dev, err = client.VirtioNetNew("")
+		dev, err = client.VirtioNetNew(mac)
 		if err != nil {
 			return err
 		}
@@ -207,18 +235,22 @@ func (d *Driver) Start() error {
 		return err
 	}
 
-	if !d.VMNet {
-		return nil
-	}
-
 	args, err := vm.ToCmdLine()
 	if err != nil {
 		return err
 	}
 	log.Infof("commandline: %s", strings.Join(args, " "))
-	if err := startVfkit(args); err != nil {
+	process, err := startVfkit(args)
+	if err != nil {
 		return err
 	}
+
+	_ = os.WriteFile(d.getPidFilePath(), []byte(strconv.Itoa(process.Pid)), 0600)
+
+	if !d.VMNet {
+		return nil
+	}
+
 	//return fmt.Errorf("starting the VM is not implemented yet!!")
 	getIP := func() error {
 		d.IPAddress, err = GetIPAddressByMACAddress(mac)
@@ -238,23 +270,40 @@ func (d *Driver) Start() error {
 
 // GetState returns the state that the host is in (running, stopped, etc)
 func (d *Driver) GetState() (state.State, error) {
+	p, err := d.findVfkitProcess()
+	if err != nil {
+		return state.Error, err
+	}
+	if p == nil {
+		return state.Stopped, nil
+	}
+	return state.Running, nil
 	/*
-		if d.vzVirtualMachine == nil {
-			return state.Stopped, nil
-		}
-		return vzStateToState(d.vzVirtualMachine.State()), nil
+			if d.vzVirtualMachine == nil {
+				return state.Stopped, nil
+			}
+			return vzStateToState(d.vzVirtualMachine.State()), nil
+		return state.Stopped, nil
 	*/
-	return state.Stopped, nil
 }
 
 // Kill stops a host forcefully
 func (d *Driver) Kill() error {
-	return errors.New("Kill() is not implemented")
+	return d.sendSignal(syscall.SIGKILL)
 }
 
 // Remove a host
 func (d *Driver) Remove() error {
-	return errors.New("Remove() is not implemented")
+	s, err := d.GetState()
+	if err != nil || s == state.Error {
+		log.Debugf("Error checking machine status: %v, assuming it has been removed already", err)
+	}
+	if s == state.Running {
+		if err := d.Kill(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // UpdateConfigRaw allows to change the state (memory, ...) of an already created machine
@@ -264,38 +313,122 @@ func (d *Driver) UpdateConfigRaw(rawDriver []byte) error {
 
 // Stop a host gracefully
 func (d *Driver) Stop() error {
-	st, err := d.GetState()
+	s, err := d.GetState()
 	if err != nil {
 		return err
 	}
-	if st == state.Stopped {
-		return nil
-	}
-	return fmt.Errorf("Stop() is not fully implemented")
-	/*
-		stopped, err := d.vzVirtualMachine.RequestStop()
-		if err != nil {
-			log.Warnf("Failed to stop VM")
-			return err
-		}
-		st, _ = d.GetState()
-		log.Warnf("Stop(): stopped: %v current state: %v", stopped, st)
-	*/
 
-	/*
-		if !stopped {
-	*/
-	for i := 0; i < 120; i++ {
-		st, _ := d.GetState()
-		log.Debugf("VM state: %s", st)
-		if st == state.Stopped {
-			return nil
+	if s != state.Stopped {
+		err := d.sendSignal(syscall.SIGTERM)
+		if err != nil {
+			return errors.Wrap(err, "hyperkit sigterm failed")
 		}
-		time.Sleep(time.Second)
+		// wait 120s for graceful shutdown
+		for i := 0; i < 60; i++ {
+			time.Sleep(2 * time.Second)
+			s, _ := d.GetState()
+			log.Debugf("VM state: %s", s)
+			if s == state.Stopped {
+				return nil
+			}
+		}
+		return errors.New("VM Failed to gracefully shutdown, try the kill command")
 	}
-	return errors.New("VM Failed to gracefully shutdown, try the kill command")
-	/*
+	return nil
+}
+
+func (d *Driver) getPidFilePath() string {
+	const pidFileName = "vfkit.pid"
+	return d.ResolveStorePath(pidFileName)
+}
+
+/*
+ * Returns a ps.Process instance if it could find a vfkit process with the pid
+ * stored in $pidFileName
+ *
+ * Returns nil, nil if:
+ * - if the $pidFileName file does not exist,
+ * - if a process with the pid from this file cannot be found,
+ * - if a process was found, but its name is not 'vfkit'
+ */
+func (d *Driver) findVfkitProcess() (ps.Process, error) {
+	pidFile := d.getPidFilePath()
+	pid, err := readPidFromFile(pidFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
 		}
+		return nil, errors.Wrapf(err, "error reading pidfile %s", pidFile)
+	}
+
+	p, err := ps.FindProcess(pid)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("cannot find pid %d", pid))
+	}
+	if p == nil {
+		log.Debugf("vfkit pid %d missing from process table", pid)
+		// return PidNotExist error?
+		return nil, nil
+	}
+
+	// match both hyperkit and com.docker.hyper
+	if p.Executable() != "vfkit" {
+		// return InvalidExecutable error?
+		log.Debugf("pid %d is stale, and is being used by %s", pid, p.Executable())
+		return nil, nil
+	}
+
+	return p, nil
+}
+
+func readPidFromFile(filename string) (int, error) {
+	bs, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return 0, err
+	}
+	content := strings.TrimSpace(string(bs))
+	pid, err := strconv.Atoi(content)
+	if err != nil {
+		return 0, errors.Wrapf(err, "parsing %s", filename)
+	}
+
+	return pid, nil
+}
+
+// recoverFromUncleanShutdown searches for an existing vfkit.pid file in
+// the machine directory. If it can't find it, a clean shutdown is assumed.
+// If it finds the pid file, it checks for a running vfkit process with that pid
+// as the existence of a file might not indicate an unclean shutdown but an actual running
+// vfkit server. This is an error situation - we shouldn't start minikube as there is likely
+// an instance running already. If the PID in the pidfile does not belong to a running vfkit
+// process, we can safely delete it, and there is a good chance the machine will recover when restarted.
+func (d *Driver) recoverFromUncleanShutdown() error {
+	proc, err := d.findVfkitProcess()
+	if err == nil && proc != nil {
+		/* hyperkit is running, pid file can't be stale */
 		return nil
-	*/
+	}
+	pidFile := d.getPidFilePath()
+	/* There might be a stale pid file, try to remove it */
+	if err := os.Remove(pidFile); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return errors.Wrap(err, fmt.Sprintf("removing pidFile %s", pidFile))
+		}
+	} else {
+		log.Debugf("Removed stale pid file %s...", pidFile)
+	}
+	return nil
+}
+
+func (d *Driver) sendSignal(s os.Signal) error {
+	psProc, err := d.findVfkitProcess()
+	if err != nil {
+		return err
+	}
+	proc, err := os.FindProcess(psProc.Pid())
+	if err != nil {
+		return err
+	}
+
+	return proc.Signal(s)
 }

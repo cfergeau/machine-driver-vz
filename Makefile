@@ -3,8 +3,9 @@ all: build codesign
 
 .PHONY: codesign
 codesign:
-	codesign --entitlements vf.entitlements -s - ./machine-driver-vf
+	codesign --entitlements vf.entitlements -s - ./vfkit
 
 .PHONY: build
 build:
 	go build -o machine-driver-vf ./cmd/machine-driver-vf
+	go build -o vfkit ./cmd/vfkit
