@@ -1,8 +1,16 @@
 CodeReady Containers Virtual Machine using macOS virtualization.framework
 ====
 
-The work in this repository makes use of https://github.com/Code-Hex/vz to create a Linux virtual machine with virtualization.framework using go.
-After building it with `make`, the `machine-driver-vf` executable must be run with the name of a bundle (eg `crc_hyperkit_4.8.4`), and a virtual machine for this bundle will be started.
-The bundle must be unpacked in `~/.crc/cache`. The `qcow2` image it contains is first converted to raw using `qemu-img` (which must be installed).
+This implements a machine driver for CodeReady Containers using macOS virtualization framework.
+This generates 2 binaries:
+- vfkit which offers a command-line interface to start virtual machines using virtualization framework
+- crc-driver-vf which is the machine driver implementation itself
 
-The current code stops the virtual machine after 3 minutes. This behaviour is unchanged from https://github.com/Code-Hex/vz/blob/master/example/main.go
+The binaries are separate as crc-driver-vf is only running for a short time to execute commands, but the binary which starts the virtual machine must keep running for the whole lifetime of the VM.
+
+In order to test this, you need to copy the crc-driver-vf and vfkit executables to ~/.crc/bin, and then use this crc branch: https://github.com/cfergeau/crc/tree/macos-vf
+The vfkit executable must be signed after being copied to ~/.crc/bin: `codesign --force  --entitlements vf.entitlements -s - ~/.crc/bin/vfkit`
+
+The machine driver currently depend on qemu-img to convert crc disk images from qcow2 to raw. qemu-img can be obtained from `brew install qemu`.
+
+The work in this repository makes use of https://github.com/Code-Hex/vz to create a Linux virtual machine with virtualization.framework using go.
