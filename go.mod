@@ -4,11 +4,8 @@ go 1.16
 
 require (
 	github.com/Code-Hex/vz v0.0.5-0.20211218053248-d70a0533bf8e
-	github.com/code-ready/crc v1.38.0
 	github.com/code-ready/machine v0.0.0-20210616065635-eff475d32b9a
 	github.com/docker/go-units v0.4.0
-	github.com/mitchellh/go-ps v1.0.0
-	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.3.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.3.0

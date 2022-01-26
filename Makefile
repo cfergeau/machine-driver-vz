@@ -7,5 +7,4 @@ codesign:
 
 .PHONY: build
 build:
-	go build -o machine-driver-vf ./cmd/machine-driver-vf
 	go build -o vfkit ./cmd/vfkit
